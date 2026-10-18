@@ -1,127 +1,139 @@
 <!DOCTYPE html>
-<html lang="en-us">
+<html lang="pt-BR">
   <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Unity Web Player | F1 Career Mobile</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#07090c">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="F1 Career">
+    <title>F1 Career Mobile</title>
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
-  <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="F1 Career"></head>
+  </head>
   <body>
+    <div id="rotate-prompt" role="status" aria-live="polite">
+      <div class="rotate-card">
+        <div class="rotate-symbol" aria-hidden="true">↻</div>
+        <p class="rotate-eyebrow">F1 CAREER MOBILE</p>
+        <h1>Gire o iPhone</h1>
+        <p>Este jogo foi projetado para jogar na horizontal.</p>
+        <p class="rotate-hint">Vire o aparelho para continuar a corrida.</p>
+      </div>
+    </div>
+
     <div id="unity-container" class="unity-desktop">
-      <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
-      <div id="unity-loading-bar">
+      <canvas id="unity-canvas" width="960" height="600" tabindex="-1" aria-label="F1 Career Mobile"></canvas>
+      <div id="unity-loading-bar" aria-live="polite">
         <div id="unity-logo"></div>
         <div id="unity-progress-bar-empty">
           <div id="unity-progress-bar-full"></div>
         </div>
+        <p id="unity-loading-text">Carregando o F1 Career Mobile…</p>
       </div>
-      <div id="unity-warning"> </div>
+      <div id="unity-warning"></div>
       <div id="unity-footer">
         <div id="unity-logo-title-footer"></div>
-        <div id="unity-fullscreen-button"></div>
+        <div id="unity-fullscreen-button" role="button" aria-label="Tela cheia" title="Tela cheia"></div>
         <div id="unity-build-title">F1 Career Mobile</div>
       </div>
     </div>
+
     <script>
-      var canvas = document.querySelector("#unity-canvas");
+      (() => {
+        const canvas = document.querySelector("#unity-canvas");
+        const container = document.querySelector("#unity-container");
+        const loadingText = document.querySelector("#unity-loading-text");
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+          || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-      // Shows a temporary message banner/ribbon for a few seconds, or
-      // a permanent error message on top of the canvas if type=='error'.
-      // If type=='warning', a yellow highlight color is used.
-      // Modify or remove this function to customize the visually presented
-      // way that non-critical warnings and error messages are presented to the
-      // user.
-      function unityShowBanner(msg, type) {
-        var warningBanner = document.querySelector("#unity-warning");
-        function updateBannerVisibility() {
-          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+        function updateOrientationState() {
+          const portrait = window.innerHeight >= window.innerWidth;
+          document.body.classList.toggle("needs-landscape", isMobile && portrait);
         }
-        var div = document.createElement('div');
-        div.innerHTML = msg;
-        warningBanner.appendChild(div);
-        if (type == 'error') div.style = 'background: red; padding: 10px;';
-        else {
-          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
-          setTimeout(function() {
-            warningBanner.removeChild(div);
-            updateBannerVisibility();
-          }, 5000);
+
+        if (isMobile) {
+          container.className = "unity-mobile";
+          canvas.className = "unity-mobile";
+          document.body.classList.add("mobile-device");
+
+          // Prevent the browser page from zooming or scrolling during touch controls.
+          document.addEventListener("gesturestart", event => event.preventDefault(), { passive: false });
+          document.addEventListener("touchmove", event => {
+            if (event.target === canvas || canvas.contains(event.target)) event.preventDefault();
+          }, { passive: false });
+
+          updateOrientationState();
+          window.addEventListener("resize", updateOrientationState, { passive: true });
+          window.addEventListener("orientationchange", () => {
+            window.setTimeout(updateOrientationState, 150);
+          }, { passive: true });
+        } else {
+          canvas.style.width = "960px";
+          canvas.style.height = "600px";
         }
-        updateBannerVisibility();
-      }
 
-      var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/F1CareerMobile.loader.js";
-      var config = {
-        arguments: [],
-        dataUrl: buildUrl + "/F1CareerMobile.data",
-        frameworkUrl: buildUrl + "/F1CareerMobile.framework.js",
-        codeUrl: buildUrl + "/F1CareerMobile.wasm",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "F1 Career Mobile",
-        productName: "F1 Career Mobile",
-        productVersion: "0.2.0",
-        showBanner: unityShowBanner,
-      };
+        // Shows temporary warnings or persistent errors above the Unity canvas.
+        window.unityShowBanner = function (message, type) {
+          const warningBanner = document.querySelector("#unity-warning");
+          const banner = document.createElement("div");
+          banner.textContent = message;
+          banner.className = type === "error" ? "unity-banner-error"
+            : type === "warning" ? "unity-banner-warning" : "unity-banner-info";
+          warningBanner.appendChild(banner);
+          warningBanner.style.display = "block";
 
-      // By default, Unity keeps WebGL canvas render target size matched with
-      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
-      // Set this to false if you want to decouple this synchronization from
-      // happening inside the engine, and you would instead like to size up
-      // the canvas DOM size and WebGL render target sizes yourself.
-      // config.matchWebGLToCanvasSize = false;
+          if (type !== "error") {
+            window.setTimeout(() => {
+              banner.remove();
+              if (!warningBanner.children.length) warningBanner.style.display = "none";
+            }, 5000);
+          }
+        };
 
-      // If you would like all file writes inside Unity Application.persistentDataPath
-      // directory to automatically persist so that the contents are remembered when
-      // the user revisits the site the next time, uncomment the following line:
-      // config.autoSyncPersistentDataPath = true;
-      // This autosyncing is currently not the default behavior to avoid regressing
-      // existing user projects that might rely on the earlier manual
-      // JS_FileSystem_Sync() behavior, but in future Unity version, this will be
-      // expected to change.
+        const buildUrl = "Build";
+        const config = {
+          arguments: [],
+          dataUrl: buildUrl + "/F1CareerMobile.data",
+          frameworkUrl: buildUrl + "/F1CareerMobile.framework.js",
+          codeUrl: buildUrl + "/F1CareerMobile.wasm",
+          streamingAssetsUrl: "StreamingAssets",
+          companyName: "F1 Career Mobile",
+          productName: "F1 Career Mobile",
+          productVersion: "0.2.0",
+          showBanner: window.unityShowBanner
+        };
 
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Mobile device style: fill the whole browser client area with the game canvas:
+        // Keep Unity's canvas backing resolution in sync with its CSS size.
+        // Do not cap devicePixelRatio here without profiling on real devices:
+        // that trades sharpness for performance and should be an evidence-based choice.
+        document.querySelector("#unity-loading-bar").style.display = "block";
 
-        var meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-        document.getElementsByTagName('head')[0].appendChild(meta);
-        document.querySelector("#unity-container").className = "unity-mobile";
-        canvas.className = "unity-mobile";
-
-        // To lower canvas resolution on mobile devices to gain some
-        // performance, uncomment the following line:
-        // config.devicePixelRatio = 1;
-
-
-      } else {
-        // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
-        canvas.style.width = "960px";
-        canvas.style.height = "600px";
-      }
-
-      document.querySelector("#unity-loading-bar").style.display = "block";
-
-      var script = document.createElement("script");
-      script.src = loaderUrl;
-      script.onload = () => {
-        createUnityInstance(canvas, config, (progress) => {
-          document.querySelector("#unity-progress-bar-full").style.width = 100 * progress + "%";
-              }).then((unityInstance) => {
-                document.querySelector("#unity-loading-bar").style.display = "none";
-                document.querySelector("#unity-fullscreen-button").onclick = () => {
-                  unityInstance.SetFullscreen(1);
-                };
-
-              }).catch((message) => {
-                alert(message);
-              });
-            };
-
-      document.body.appendChild(script);
-
+        const loader = document.createElement("script");
+        loader.src = buildUrl + "/F1CareerMobile.loader.js";
+        loader.onload = () => {
+          createUnityInstance(canvas, config, progress => {
+            document.querySelector("#unity-progress-bar-full").style.width = (100 * progress) + "%";
+            if (loadingText) loadingText.textContent = "Carregando o F1 Career Mobile… " + Math.round(progress * 100) + "%";
+          }).then(unityInstance => {
+            document.querySelector("#unity-loading-bar").style.display = "none";
+            const fullscreenButton = document.querySelector("#unity-fullscreen-button");
+            if (fullscreenButton) {
+              fullscreenButton.addEventListener("click", () => unityInstance.SetFullscreen(1));
+            }
+          }).catch(error => {
+            document.querySelector("#unity-loading-bar").style.display = "none";
+            window.unityShowBanner("Não foi possível iniciar o jogo: " + error, "error");
+          });
+        };
+        loader.onerror = () => {
+          document.querySelector("#unity-loading-bar").style.display = "none";
+          window.unityShowBanner("Falha ao carregar os arquivos do jogo. Atualize a página e tente novamente.", "error");
+        };
+        document.body.appendChild(loader);
+      })();
     </script>
   </body>
 </html>
